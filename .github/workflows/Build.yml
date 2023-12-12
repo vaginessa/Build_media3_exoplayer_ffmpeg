@@ -1,0 +1,60 @@
+name: Build Media3 Exoplayer FFmpeg
+
+on:
+  workflow_dispatch:
+    inputs:
+      ENABLED_DECODERS:
+        description: "ENABLED_DECODERS"
+        required: true
+        default: 'vorbis opus flac alac pcm_mulaw pcm_alaw mp3 amrnb amrwb aac ac3 eac3 dca mlp truehd'
+      FFMPEG_RELEASE_BRANCH:
+        description: "FFMPEG_RELEASE_BRANCH"
+        required: true
+        default: '4.2'
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'adopt'
+          
+      - name: Set up Android NDK
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          wget https://dl.google.com/android/repository/android-ndk-r21e-linux-x86_64.zip
+          unzip android-ndk-r21e-linux-x86_64.zip
+          rm android-ndk-r21e-linux-x86_64.zip
+
+      - name: Build Media3 Exoplayer FFmpeg
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git clone https://github.com/androidx/media -b release
+          cd media
+          FFMPEG_MODULE_PATH="$(pwd)/libraries/decoder_ffmpeg/src/main"
+          NDK_PATH="$GITHUB_WORKSPACE"/android-ndk-r21e
+          HOST_PLATFORM="linux-x86_64"
+          ENABLED_DECODERS=(${{ github.event.inputs.ENABLED_DECODERS }})
+          cd libraries/decoder_ffmpeg && \
+          git clone git://source.ffmpeg.org/ffmpeg && \
+          cd ffmpeg && \
+          git checkout release/${{ github.event.inputs.FFMPEG_RELEASE_BRANCH }} && \
+          FFMPEG_PATH="$(pwd)"
+          cd "${FFMPEG_MODULE_PATH}/jni" && \
+          ln -s "$FFMPEG_PATH" ffmpeg
+          cd "${FFMPEG_MODULE_PATH}/jni" && \
+          ./build_ffmpeg.sh \
+          "${FFMPEG_MODULE_PATH}" "${NDK_PATH}" "${HOST_PLATFORM}" "${ENABLED_DECODERS[@]}"
+
+      - name: Upload Media3 Exoplayer FFmpeg
+        uses: actions/upload-artifact@v3
+        with:
+          name: Media3 Exoplayer FFmpeg
+          path: media/libraries/decoder_ffmpeg/ffmpeg/android-libs/*
