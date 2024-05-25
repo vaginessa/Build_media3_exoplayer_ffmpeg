@@ -1,0 +1,49 @@
+name: (2) Build Media3 Exoplayer FFmpeg
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'adopt'
+          
+      - name: Fetch Media3 repository
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git clone https://github.com/androidx/media -b release
+          cd media
+          FFMPEG_MODULE_PATH="$(pwd)/libraries/decoder_ffmpeg/src/main"
+          cd "$GITHUB_WORKSPACE"
+          wget https://dl.google.com/android/repository/android-ndk-r26d-linux.zip
+          unzip android-ndk-r26d-linux.zip
+          rm android-ndk-r26d-linux.zip
+          NDK_PATH="$GITHUB_WORKSPACE"/android-ndk-r26d      
+          HOST_PLATFORM="linux-x86_64"
+          ANDROID_ABI=21
+          cd "$GITHUB_WORKSPACE"
+          git clone git://source.ffmpeg.org/ffmpeg
+          cd ffmpeg
+          git checkout release/6.0
+          FFMPEG_PATH="$(pwd)"
+          cd "$GITHUB_WORKSPACE"
+          ENABLED_DECODERS=(alac aac dca)
+          cd "${FFMPEG_MODULE_PATH}/jni"
+          ln -s "$FFMPEG_PATH" ffmpeg
+          cd "${FFMPEG_MODULE_PATH}/jni"
+          ./build_ffmpeg.sh "${FFMPEG_MODULE_PATH}" "${NDK_PATH}" "${HOST_PLATFORM}" "${ANDROID_ABI}" "${ENABLED_DECODERS[@]}"
+
+      - name: Upload Media3 Exoplayer FFmpeg
+        uses: actions/upload-artifact@v3
+        with:
+          name: Media3 Exoplayer FFmpeg
+          path: media/libraries/decoder_ffmpeg/ffmpeg/android-libs/*
